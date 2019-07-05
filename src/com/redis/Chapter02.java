@@ -9,8 +9,8 @@ import java.util.UUID;
 
 public class Chapter02 {
 
-    public static void main(String[] args) {
-
+    public static void main(String[] args) throws InterruptedException {
+        new Chapter02().run();
     }
 
     public void run() throws InterruptedException {
