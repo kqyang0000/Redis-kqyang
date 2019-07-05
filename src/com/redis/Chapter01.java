@@ -11,7 +11,7 @@ public class Chapter01 {
     private static final int ARTICLES_PER_PAGE = 25;
 
     public static void main(String[] args) {
-
+        new Chapter01().run();
     }
 
     public void run() {
@@ -19,7 +19,7 @@ public class Chapter01 {
          * 连接初始化
          */
         Jedis conn = new Jedis("127.0.0.1", 6379);
-        conn.auth("123456");
+//        conn.auth("123456");
         conn.select(15);
         /*
          * 文章发表
@@ -54,11 +54,13 @@ public class Chapter01 {
          * 添加分组
          */
         addGroups(conn, articleId, new String[]{"new-group"});
-        System.out.println("We added the article to a new group, other articles include:");
         /*
          * 获取组内文章
          */
-
+        System.out.println("We added the article to a new group, other articles include:");
+        articles = getGroupArticles(conn, "new-group", 1, articleId);
+        printArticles(articles);
+        assert articles.size() >= 1;
     }
 
     /**
@@ -198,6 +200,16 @@ public class Chapter01 {
         return getGroupArticles(conn, group, page, "score:", articleId);
     }
 
+    /**
+     * 获取组内文章
+     *
+     * @param conn
+     * @param group
+     * @param page
+     * @param score
+     * @param articleId
+     * @return
+     */
     public List<Map<String, String>> getGroupArticles(Jedis conn, String group, int page, String score, String articleId) {
         String key = score + group;
         if (!conn.exists(key)) {
