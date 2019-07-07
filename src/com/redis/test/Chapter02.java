@@ -2,10 +2,9 @@ package com.redis.test;
 
 import com.redis.common.Base;
 
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.*;
 
 public class Chapter02 extends Base {
 
@@ -22,6 +21,10 @@ public class Chapter02 extends Base {
          * 购物车测试
          */
         testShoppingCartCookies();
+        /*
+         * 缓存网页测试
+         */
+        testCacheRequest();
     }
 
     /**
@@ -117,6 +120,36 @@ public class Chapter02 extends Base {
             printer(entry.getKey() + ":" + entry.getValue());
         }
         assert items.size() == 0;
+    }
+
+    /**
+     * 测试缓存网页
+     */
+    public void testCacheRequest() {
+        printer("\n----- testCacheRequest -----");
+        String token = getToken();
+
+        Callback callback = new Callback() {
+            @Override
+            public String call(String request) {
+                return "content for " + request;
+            }
+        };
+
+        updateToken(token, "username", "itemX");
+        String url = "http://test.com/?item=itemX";
+        printer("We are going to cache a simple request against " + url);
+        String result = cacheRequest(url, callback, token);
+        printer("We got initial content:\n" + result);
+        printer();
+        assert result != null;
+
+        printer("To test that we've cached the request, we'll pass a bad callback");
+        String result2 = cacheRequest(url, null, token);
+        printer("We ended up getting the same response!\n" + result2);
+        assert result.equals(result2);
+        assert canCache("http://test.com/", token);
+        assert canCache("http://test.com/?item=itemX&_=123456", token);
     }
 
     /**
@@ -247,5 +280,95 @@ public class Chapter02 extends Base {
                 conn.zrem("recent:", sessions);
             }
         }
+    }
+
+    /**
+     * 回调接口
+     */
+    public interface Callback {
+        String call(String request);
+    }
+
+    /**
+     * 缓存请求
+     *
+     * @param request
+     * @param callback
+     * @param token
+     * @return
+     */
+    public String cacheRequest(String request, Callback callback, String token) {
+        if (!canCache(request, token)) {
+            return callback != null ? callback.call(request) : null;
+        }
+
+        String pageKey = "cache:" + hashRequest(request);
+        String content = conn.get(pageKey);
+
+        if (content == null && callback != null) {
+            content = callback.call(request);
+            conn.setex(pageKey, 300, content);
+        }
+        return content;
+    }
+
+    /**
+     * 验证是否可以缓存
+     *
+     * @param request
+     * @param token
+     * @return
+     */
+    public boolean canCache(String request, String token) {
+        try {
+            URL url = new URL(request);
+            Map<String, String> params = new HashMap<>(16);
+            if (url.getQuery() != null) {
+                for (String param : url.getQuery().split("&")) {
+                    String[] pair = param.split("=", 2);
+                    params.put(pair[0], pair.length == 2 ? pair[1] : null);
+                }
+            }
+
+            String itemId = extractItemId(params);
+            if (itemId == null || isDynamic(params)) {
+                return false;
+            }
+            Long rank = conn.zrank("viewed:" + token, itemId);
+            return rank != null && rank < 10000;
+        } catch (MalformedURLException e) {
+            printer("canCache method exception: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * 提取商品id
+     *
+     * @param params
+     * @return
+     */
+    public String extractItemId(Map<String, String> params) {
+        return params.get("item");
+    }
+
+    /**
+     * 判断是否为动态参数
+     *
+     * @param params
+     * @return
+     */
+    public boolean isDynamic(Map<String, String> params) {
+        return params.containsKey("_");
+    }
+
+    /**
+     * 获取hash值
+     *
+     * @param request
+     * @return
+     */
+    public String hashRequest(String request) {
+        return String.valueOf(request.hashCode());
     }
 }
