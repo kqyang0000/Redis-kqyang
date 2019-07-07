@@ -1,49 +1,57 @@
-package com.redis;
+package com.redis.test;
 
-import redis.clients.jedis.Jedis;
+import com.redis.common.Base;
 
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
-public class Chapter02 {
+public class Chapter02 extends Base {
 
     public static void main(String[] args) throws InterruptedException {
         new Chapter02().run();
     }
 
     public void run() throws InterruptedException {
-        Jedis conn = new Jedis("127.0.0.1", 6379);
-        conn.select(14);
-        testLoginCookies(conn);
+        /*
+         * 登陆测试
+         */
+        testLoginCookies();
+        /*
+         * 购物车测试
+         */
+        testShoppingCartCookies();
     }
 
     /**
      * 测试登录cookies
-     *
-     * @param conn
      */
-    public void testLoginCookies(Jedis conn) throws InterruptedException {
-        System.out.println("----- testLoginCookies -----");
-        String token = UUID.randomUUID().toString();
+    public void testLoginCookies() throws InterruptedException {
+        printer("----- testLoginCookies -----");
+        String token = getToken();
         /*
          * 更新token
          */
-        updateToken(conn, token, "username", "itemX");
-        System.out.println("We just logged-in/updated token:" + token);
-        System.out.println("For user:'username'");
-        System.out.println();
+        updateToken(token, "username", "itemX");
+        printer("We just logged-in/updated token:" + token);
+        printer("For user:'username'");
+        printer();
 
-        System.out.println("What username do we get when we look-up that token?");
-        String user = checkToken(conn, token);
-        System.out.println(user);
-        System.out.println();
+        /*
+         * 验证token
+         */
+        printer("What username do we get when we look-up that token?");
+        String user = checkToken(token);
+        printer(user);
+        printer();
         assert user != null;
 
-        System.out.println("Let's drop the maximum number of cookies to 0 to clean them out");
-        System.out.println("We will start a thread to do the cleaning, while we stop it later");
-        CleanSessionsThread thread = new CleanSessionsThread(0);
+        /*
+         * 缓存清理
+         */
+        printer("Let's drop the maximum number of cookies to 0 to clean them out");
+        printer("We will start a thread to do the cleaning, while we stop it later");
+        CleanSessionsThread thread = new CleanSessionsThread(10000000);
         thread.start();
         Thread.sleep(1000);
         thread.quit();
@@ -53,19 +61,26 @@ public class Chapter02 {
         }
 
         long s = conn.hlen("login:");
-        System.out.println("The current number of sessions still available is:" + s);
+        printer("The current number of sessions still available is:" + s);
         assert s == 0;
+    }
+
+    /**
+     * 测试购物车
+     */
+    public void testShoppingCartCookies() {
+        printer("\n----- testShoppingCartCookies -----");
+        String token = getToken();
     }
 
     /**
      * 更新token
      *
-     * @param conn
      * @param token
      * @param user
      * @param item
      */
-    public void updateToken(Jedis conn, String token, String user, String item) {
+    public void updateToken(String token, String user, String item) {
         long timestamp = System.currentTimeMillis() / 1000;
         conn.hset("login:", token, user);
         conn.zadd("recent:", timestamp, token);
@@ -78,11 +93,10 @@ public class Chapter02 {
     /**
      * 检查token
      *
-     * @param conn
      * @param token
      * @return
      */
-    public String checkToken(Jedis conn, String token) {
+    public String checkToken(String token) {
         return conn.hget("login:", token);
     }
 
@@ -90,13 +104,10 @@ public class Chapter02 {
      * 清理session线程
      */
     public class CleanSessionsThread extends Thread {
-        private Jedis conn;
         private int limit;
         private boolean quit;
 
         public CleanSessionsThread(int limit) {
-            this.conn = new Jedis("127.0.0.1", 6379);
-            this.conn.select(14);
             this.limit = limit;
         }
 
