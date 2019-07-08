@@ -1,6 +1,8 @@
 package com.redis.test;
 
+import com.google.gson.Gson;
 import com.redis.common.Base;
+import redis.clients.jedis.Tuple;
 
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -16,15 +18,19 @@ public class Chapter02 extends Base {
         /*
          * 登陆测试
          */
-        testLoginCookies();
+//        testLoginCookies();
         /*
          * 购物车测试
          */
-        testShoppingCartCookies();
+//        testShoppingCartCookies();
         /*
          * 缓存网页测试
          */
-        testCacheRequest();
+//        testCacheRequest();
+        /*
+         * 数据行缓存测试
+         */
+        testCacheRows();
     }
 
     /**
@@ -150,6 +156,63 @@ public class Chapter02 extends Base {
         assert result.equals(result2);
         assert canCache("http://test.com/", token);
         assert canCache("http://test.com/?item=itemX&_=123456", token);
+    }
+
+    /**
+     * 测试缓存行数据
+     */
+    public void testCacheRows() throws InterruptedException {
+        printer("\n----- testCacheRows -----");
+        printer("First, let's schedule caching of itemX every 5 seconds");
+
+        /*
+         * 缓存行
+         */
+        scheduleRowCache("itemX", 5);
+        printer("Our schedule looks like:");
+
+        /*
+         * 打印行
+         */
+        Set<Tuple> s = conn.zrangeWithScores("schedule:", 0, -1);
+        for (Tuple tuple : s) {
+            printer(tuple.getElement() + ", " + (float) tuple.getScore());
+        }
+        assert s.size() != 0;
+
+        printer("We'll start a caching thread that will cache the data...");
+        CacheRowsThread thread = new CacheRowsThread();
+        thread.start();
+
+        Thread.sleep(1000);
+        printer("Our cached data looks like:");
+        String r = conn.get("inv:itemX");
+        printer(r);
+        assert r != null;
+        printer();
+
+        printer("We'll check again in 5 seconds...");
+        Thread.sleep(5000);
+        printer("Notice that the data has changed...");
+        String r2 = conn.get("inv:itemX");
+        printer(r2);
+        printer();
+        assert r2 != null;
+        assert !r.equals(r2);
+
+        printer("Let's force un-caching");
+        scheduleRowCache("itemX", -1);
+        Thread.sleep(1000);
+        r = conn.get("inv:itemX");
+        printer("The cache was cleared? " + (r == null));
+        assert r == null;
+
+        thread.quit();
+        Thread.sleep(2000);
+        if (thread.isAlive()) {
+            throw new RuntimeException("The database caching thread is still alive!");
+        }
+
     }
 
     /**
@@ -370,5 +433,76 @@ public class Chapter02 extends Base {
      */
     public String hashRequest(String request) {
         return String.valueOf(request.hashCode());
+    }
+
+    /**
+     * 缓存行
+     *
+     * @param rowId
+     * @param delay
+     */
+    public void scheduleRowCache(String rowId, int delay) {
+        conn.zadd("delay:", delay, rowId);
+        conn.zadd("schedule:", System.currentTimeMillis() / 1000, rowId);
+    }
+
+    /**
+     * 缓存行线程
+     */
+    public class CacheRowsThread extends Thread {
+        private boolean quit;
+
+        public void quit() {
+            quit = true;
+        }
+
+        @Override
+        public void run() {
+            Gson gson = new Gson();
+            while (!quit) {
+                Set<Tuple> range = conn.zrangeWithScores("schedule:", 0, 0);
+                Tuple next = range.size() > 0 ? range.iterator().next() : null;
+                long now = System.currentTimeMillis() / 1000;
+                if (next == null || next.getScore() > now) {
+                    try {
+                        sleep(50);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    continue;
+                }
+
+                String rowId = next.getElement();
+                Double delay = conn.zscore("delay:", rowId);
+                if (delay <= 0) {
+                    conn.zrem("delay:", rowId);
+                    conn.zrem("schedule:", rowId);
+                    conn.del("inv:" + rowId);
+                }
+
+                Inventory row = Inventory.get(rowId);
+                conn.zadd("schedule:", now, rowId);
+                conn.set("inv:" + rowId, gson.toJson(row));
+            }
+        }
+    }
+
+    /**
+     * 库存实体
+     */
+    public static class Inventory {
+        private String id;
+        private String data;
+        private long time;
+
+        private Inventory(String id) {
+            this.id = id;
+            this.data = "data to cache...";
+            this.time = System.currentTimeMillis() / 1000;
+        }
+
+        public static Inventory get(String id) {
+            return new Inventory(id);
+        }
     }
 }
