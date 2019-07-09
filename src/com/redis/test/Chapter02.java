@@ -478,10 +478,11 @@ public class Chapter02 extends Base {
                     conn.zrem("delay:", rowId);
                     conn.zrem("schedule:", rowId);
                     conn.del("inv:" + rowId);
+                    continue;
                 }
 
                 Inventory row = Inventory.get(rowId);
-                conn.zadd("schedule:", now, rowId);
+                conn.zadd("schedule:", now + delay, rowId);
                 conn.set("inv:" + rowId, gson.toJson(row));
             }
         }
