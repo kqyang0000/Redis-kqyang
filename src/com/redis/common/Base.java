@@ -2,6 +2,7 @@ package com.redis.common;
 
 import redis.clients.jedis.Jedis;
 
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -14,7 +15,7 @@ public class Base {
     private static final int INDEX = 14;
     protected static Jedis conn = null;
 
-    public Base() {
+    protected Base() {
         Jedis conn = new Jedis(LOCAL_HOST, PORT);
 //        conn.auth(PASSWORD);
         conn.select(INDEX);
@@ -24,7 +25,7 @@ public class Base {
     /**
      * 生成token
      */
-    public String getToken() {
+    protected String getToken() {
         return UUID.randomUUID().toString();
     }
 
@@ -33,7 +34,7 @@ public class Base {
      *
      * @param messages
      */
-    public void printer(String... messages) {
+    protected void printer(String... messages) {
         if (messages != null && messages.length > 0) {
             for (String mm : messages) {
                 System.out.print(mm);
@@ -42,5 +43,13 @@ public class Base {
         } else {
             System.out.println();
         }
+    }
+
+    /**
+     * 清空库
+     */
+    protected void clearKeys() {
+        Set<String> keys = conn.keys("*");
+        conn.del(keys == null ? null : keys.toArray(new String[keys.size()]));
     }
 }
