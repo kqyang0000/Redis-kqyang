@@ -200,6 +200,9 @@ public class Chapter01 extends Base {
     public List<Map<String, String>> getGroupArticles(String group, int page, String score, String articleId) {
         String key = score + group;
         if (!conn.exists(key)) {
+            /*
+             * 取两集合交集，并生成新的集合
+             */
             ZParams zParams = new ZParams().aggregate(ZParams.Aggregate.MAX);
             conn.zinterstore(key, zParams, "group:" + group, score + articleId);
             conn.expire(key, 60);

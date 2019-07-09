@@ -228,7 +228,21 @@ public class Chapter02 extends Base {
         conn.zadd("recent:", timestamp, token);
         if (item != null) {
             conn.zadd("viewed:" + token, timestamp, item);
+            /*
+             * 移除排序集合中区间内的成员
+             *     eg:  1  2  3  4  5  6  7  8  9
+             *  index:  0  1  2  3  4  5  6  7  8
+             * -index: -9 -8 -7 -6 -5 -4 -3 -2  -1
+             * conn.zremrangeByRank(key,0,-7)
+             * result:           4  5  6  7  8  9
+             * formula: 0,-(saveCount+1)
+             */
             conn.zremrangeByRank("viewed:" + token, 0, -26);
+            /*
+             * 网页分析，新添加的代码
+             * 作用：用户浏览量越多，则score值越小，则当前商品越在有序集合上面的位置
+             */
+            conn.zincrby("viewed:", -1, item);
         }
     }
 
