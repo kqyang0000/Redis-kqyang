@@ -1,4 +1,4 @@
-package com.redis.test;
+package com.redis.chapter;
 
 import com.google.gson.Gson;
 import com.redis.common.Base;
@@ -143,19 +143,19 @@ public class Chapter02 extends Base {
         };
 
         updateToken(token, "username", "itemX");
-        String url = "http://test.com/?item=itemX";
+        String url = "http://chapter.com/?item=itemX";
         printer("We are going to cache a simple request against " + url);
         String result = cacheRequest(url, callback, token);
         printer("We got initial content:\n" + result);
         printer();
         assert result != null;
 
-        printer("To test that we've cached the request, we'll pass a bad callback");
+        printer("To chapter that we've cached the request, we'll pass a bad callback");
         String result2 = cacheRequest(url, null, token);
         printer("We ended up getting the same response!\n" + result2);
         assert result.equals(result2);
-        assert canCache("http://test.com/", token);
-        assert canCache("http://test.com/?item=itemX&_=123456", token);
+        assert canCache("http://chapter.com/", token);
+        assert canCache("http://chapter.com/?item=itemX&_=123456", token);
     }
 
     /**

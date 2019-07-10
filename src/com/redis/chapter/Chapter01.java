@@ -1,4 +1,4 @@
-package com.redis.test;
+package com.redis.chapter;
 
 import com.redis.common.Base;
 import redis.clients.jedis.ZParams;
