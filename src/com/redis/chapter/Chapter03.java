@@ -83,4 +83,19 @@ public class Chapter03 extends Base {
             conn.brpoplpush("l1", "l2", 20);
         }
     }
+
+    /**
+     * 集合操作
+     */
+    public class SET {
+        private final String key = "set-key";
+
+        public SET() {
+            run();
+        }
+
+        public void run() {
+            // 1.
+        }
+    }
 }
