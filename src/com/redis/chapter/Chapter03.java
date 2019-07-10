@@ -8,6 +8,7 @@ public class Chapter03 extends Base {
     public static void main(String[] args) {
         new Chapter03().new STRING();
         new Chapter03().new LIST();
+//        new Chapter03().clearKeys();
     }
 
     /**
@@ -95,7 +96,34 @@ public class Chapter03 extends Base {
         }
 
         public void run() {
-            // 1.
+            // 1.将一个或多个元素添加到集合里面，返回添加元素中并不存在于集合里面的数量
+            conn.sadd(key, "a", "b", "b");
+            // 2.从集合中移除一个或多个元素，并返回移除元素的数量
+            conn.srem(key, "a", "b");
+            // 3.检查元素是否存在于集合中
+            conn.sismember(key, "a");
+            // 4.返回集合中包含元素的数量
+            conn.scard(key);
+            // 5.返回集合包含的所有元素
+            conn.smembers(key);
+            // 6.从集合里随机返回一个或多个元素，当count为正数时，返回的元素不会重复，为负数时可能会出现重复
+            conn.srandmember(key, 3);
+            // 7.随机的移除一个或多个元素，并返回该元素
+            conn.spop(key, 2);
+            // 8.从集合一中移除一个元素到集合二中，如果移除成功则返回1否则返回0
+            conn.smove("s1", "s2", "a");
+            // 9.返回存在于第一集合但并不存在于其他集合中的元素（数学上的差集运算）
+            conn.sdiff("s1", "s2", "s3");
+            // 10.将存在于第一集合但不存在于其他集合的元素存储在dest集合中
+            conn.sdiffstore("dest", "s1", "s2");
+            // 11.返回同时存在于所有集合中的元素（数学上的交集运算）
+            conn.sinter("s1", "s2", "s3");
+            // 12.返回同时存在于所有集合中的元素（数学上的交集运算）,并存储在dest集合中
+            conn.sinterstore("dest", "s1", "s2", "s3");
+            // 13.返回至少存在于一个集合中的元素（数学上的并集）
+            conn.sunion("s1", "s2", "s3");
+            // 14.返回至少存在于一个集合中的元素（数学上的并集）,并存储在dest集合中
+            conn.sunionstore("dest", "s1", "s2");
         }
     }
 }
