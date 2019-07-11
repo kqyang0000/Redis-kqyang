@@ -13,7 +13,7 @@ public class Chapter03 extends Base {
         new Chapter03().new LIST();
         new Chapter03().new SET();
         new Chapter03().new HASH();
-//        new Chapter03().clearKeys();
+        new Chapter03().new ZSET();
     }
 
     /**
