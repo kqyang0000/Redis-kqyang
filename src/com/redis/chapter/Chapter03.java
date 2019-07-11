@@ -10,6 +10,8 @@ public class Chapter03 extends Base {
     public static void main(String[] args) {
         new Chapter03().new STRING();
         new Chapter03().new LIST();
+        new Chapter03().new SET();
+        new Chapter03().new HASH();
 //        new Chapter03().clearKeys();
     }
 
