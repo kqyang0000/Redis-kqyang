@@ -2,6 +2,7 @@ package com.redis.chapter;
 
 import com.redis.common.Base;
 import redis.clients.jedis.BitOP;
+import redis.clients.jedis.ZParams;
 
 import java.util.HashMap;
 
@@ -162,6 +163,52 @@ public class Chapter03 extends Base {
             conn.hincrBy(key, "age", 1);
             // 10.将键对应的值加上浮点数，会返回操作后的值
             conn.hincrByFloat(key, "weight", 2.1);
+        }
+    }
+
+    /**
+     * 有序集合
+     */
+    public class ZSET {
+        private final String key = "zset-key";
+
+        public ZSET() {
+            run();
+        }
+
+        public void run() {
+            // 1.将带有分值的成员添加到有序集合里面
+            conn.zadd(key, 100, "yimao");
+            // 2.移除指定的成员，并返回移除的成员数量
+            conn.zrem(key, "yimao", "ermao");
+            // 3.返回有序集合中成员数量
+            conn.zcard(key);
+            // 4.给集合中成员加分
+            conn.zincrby(key, 100, "yimao");
+            // 5.返回分值在min与max之间的成员数量
+            conn.zcount(key, 102, 105);
+            // 6.返回成员在有序集合中的排名，成员按照分值从小到大排列 最小排名：0
+            conn.zrank(key, "yimao");
+            // 7.返回成员分值
+            conn.zscore(key, "ermao");
+            // 8.返回集合中指定范围内的成员
+            conn.zrange(key, 0, -1);
+            // 9.返回有序集合成员排名，成员按照分值从大到小排列
+            conn.zrevrank(key, "yimao");
+            // 10.返回有序集合给定排名范围内的成员，成员按分值从大到小排列
+            conn.zrevrange(key, 0, -1);
+            // 11.返回有序集合中分值在min与max之间的所有成员
+            conn.zrangeByScore(key, 100, 105);
+            // 12.返回有序集合中分值在min与max之间的所有成员，按照分值从大到小的顺序排列
+            conn.zrevrangeByScore(key, 105, 100);
+            // 13.移除有序集合中排名在start与end之间的所有成员
+            conn.zremrangeByRank(key, 0, 1);
+            // 14.移除有序集合中分值在min与max之间的所有成员
+            conn.zremrangeByScore(key, 100, 105);
+            // 15.对给定的有序集合执行类似数学集合中的交集运算
+            conn.zinterstore("dest-key", new ZParams().aggregate(ZParams.Aggregate.MAX), "z1", "z2");
+            // 16.对给定的有序集合执行类似数学集合中的并集运算
+            conn.zunionstore("dest-key", new ZParams().aggregate(ZParams.Aggregate.MAX), "z1", "z2");
         }
     }
 }
