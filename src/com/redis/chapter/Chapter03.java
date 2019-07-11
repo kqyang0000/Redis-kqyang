@@ -1,9 +1,11 @@
 package com.redis.chapter;
 
 import com.redis.common.Base;
-import redis.clients.jedis.BitOP;
-import redis.clients.jedis.ZParams;
+import redis.clients.jedis.*;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.HashMap;
 
 public class Chapter03 extends Base {
@@ -14,6 +16,32 @@ public class Chapter03 extends Base {
         new Chapter03().new SET();
         new Chapter03().new HASH();
         new Chapter03().new ZSET();
+
+        /*
+         * 测试redis消息发布订阅
+         * JedisPool(GenericObjectPoolConfig poolConfig, String host, int port, int timeout, String password, int database)
+         */
+        new Chapter03().run();
+    }
+
+    /**
+     * 程序测试执行体
+     */
+    public void run() {
+        JedisPool jedisPool = new JedisPool(new JedisPoolConfig(), "127.0.0.1", 6379, 2000, "", 14);
+        printer(String.format("redis pool is starting, redis ip %s, redis port %d", "127.0.0.1", 6379));
+
+        /*
+         * 订阅者
+         */
+        SubThread subThread = new SubThread(jedisPool);
+        subThread.start();
+
+        /*
+         * 发布者
+         */
+        Publisher publisher = new Publisher(jedisPool);
+        publisher.start();
     }
 
     /**
@@ -209,6 +237,105 @@ public class Chapter03 extends Base {
             conn.zinterstore("dest-key", new ZParams().aggregate(ZParams.Aggregate.MAX), "z1", "z2");
             // 16.对给定的有序集合执行类似数学集合中的并集运算
             conn.zunionstore("dest-key", new ZParams().aggregate(ZParams.Aggregate.MAX), "z1", "z2");
+        }
+    }
+
+    /**
+     * 消息发布者
+     */
+    public class Publisher extends Thread {
+        private final JedisPool jedisPool;
+
+        public Publisher(JedisPool jedisPool) {
+            this.jedisPool = jedisPool;
+        }
+
+        @Override
+        public void run() {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+            Jedis jedis = jedisPool.getResource();
+            while (true) {
+                String line = null;
+                try {
+                    line = reader.readLine();
+                    if (!"quit".equals(line)) {
+                        jedis.publish("mychannel", line);
+                    } else {
+                        break;
+                    }
+                } catch (IOException ioe) {
+                    ioe.printStackTrace();
+                }
+            }
+        }
+    }
+
+    /**
+     * 消息订阅者
+     */
+    public class Subscriber extends JedisPubSub {
+        public Subscriber() {
+        }
+
+        /**
+         * 接收消息时会调用
+         *
+         * @param channel
+         * @param message
+         */
+        @Override
+        public void onMessage(String channel, String message) {
+            printer("receive redis published message, channel is [" + channel + "], message is [" + message + "]");
+        }
+
+        /**
+         * 订阅频道时会调用
+         *
+         * @param channel
+         * @param subscribedChannels
+         */
+        @Override
+        public void onSubscribe(String channel, int subscribedChannels) {
+            printer("subscribe redis channel success, channel is [" + channel + "], subscribedChannels is [" + subscribedChannels + "]");
+        }
+
+        /**
+         * 取消订阅频道时会调用
+         *
+         * @param channel
+         * @param subscribedChannels
+         */
+        @Override
+        public void onUnsubscribe(String channel, int subscribedChannels) {
+            printer("unsubscribe redis channel success, channel is [" + channel + "], subscribedChannels is [" + subscribedChannels + "]");
+        }
+    }
+
+    /**
+     * 消息订阅线程
+     */
+    public class SubThread extends Thread {
+        private final JedisPool jedisPool;
+        private final Subscriber subscriber = new Subscriber();
+        private final String channel = "mychannel";
+
+        public SubThread(JedisPool jedisPool) {
+            super("SubThread");
+            this.jedisPool = jedisPool;
+        }
+
+        @Override
+        public void run() {
+            printer(String.format("subscribe redis, channel %s, thread will be blocked", channel));
+            Jedis jedis = null;
+            try {
+                jedis = jedisPool.getResource();
+                jedis.subscribe(subscriber, channel);
+            } catch (Exception e) {
+                printer(String.format("subscribe channel error, %s", e));
+            } finally {
+                jedis.close();
+            }
         }
     }
 }
