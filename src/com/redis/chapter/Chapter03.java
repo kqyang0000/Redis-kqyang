@@ -3,6 +3,8 @@ package com.redis.chapter;
 import com.redis.common.Base;
 import redis.clients.jedis.BitOP;
 
+import java.util.HashMap;
+
 public class Chapter03 extends Base {
 
     public static void main(String[] args) {
@@ -124,6 +126,40 @@ public class Chapter03 extends Base {
             conn.sunion("s1", "s2", "s3");
             // 14.返回至少存在于一个集合中的元素（数学上的并集）,并存储在dest集合中
             conn.sunionstore("dest", "s1", "s2");
+        }
+    }
+
+    /**
+     * 散列
+     */
+    public class HASH {
+        private final String key = "hash-key";
+
+        public HASH() {
+            run();
+        }
+
+        public void run() {
+            // 1.为散列里面的一个或多个键设置值
+            conn.hmset(key, new HashMap<>(16));
+            // 2.从散列里面获取一个或多个键的值
+            conn.hmget(key, "name:", "age:");
+            // 3.删除散列里面的一个或多个键值对，返回成功找到并删除的键值对数量
+            conn.hdel(key, "name", "age");
+            // 4.返回散列包含的键值对数量
+            conn.hlen(key);
+            // 5.检查给定的键是否存在于hash散列中
+            conn.hexists(key, "name");
+            // 6.获取散列包含的所有键
+            conn.hkeys(key);
+            // 7.获取散列包含的所有值
+            conn.hvals(key);
+            // 8.获取散列包含的所有键值对
+            conn.hgetAll(key);
+            // 9.将键对应的值加上整数，会返回操作后的值
+            conn.hincrBy(key, "age", 1);
+            // 10.将键对应的值加上浮点数，会返回操作后的值
+            conn.hincrByFloat(key, "weight", 2.1);
         }
     }
 }
