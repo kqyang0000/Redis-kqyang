@@ -24,7 +24,7 @@ public class Chapter01 extends Base {
         /*
          * 获取文章详情
          */
-        Map<String, String> articleData = conn.hgetAll("article:" + articleId);
+        Map<String, String> articleData = getConn().hgetAll("article:" + articleId);
         for (Map.Entry<String, String> entry : articleData.entrySet()) {
             printer(entry.getKey() + ":" + entry.getValue());
         }
@@ -34,7 +34,7 @@ public class Chapter01 extends Base {
          * b.打印投票数
          */
         articleVote("other_user", articleId);
-        String votes = conn.hget("article:" + articleId, "votes");
+        String votes = getConn().hget("article:" + articleId, "votes");
         printer("We voted for the article, it now has votes:" + votes);
         assert Integer.parseInt(votes) > 1;
         /*
@@ -66,13 +66,13 @@ public class Chapter01 extends Base {
      * @return
      */
     public String postArticle(String user, String title, String link) {
-        String articleId = String.valueOf(conn.incr("article:"));
+        String articleId = String.valueOf(getConn().incr("article:"));
         /*
          * 以投票id为键user为值，添加到set集合，并设置投票过期时间（一周）
          */
         String voted = "voted:" + articleId;
-        conn.sadd(voted, user);
-        conn.expire(voted, ONE_WEEK_IN_SECONDS);
+        getConn().sadd(voted, user);
+        getConn().expire(voted, ONE_WEEK_IN_SECONDS);
         long now = System.currentTimeMillis() / 1000;
         String articleKey = "article:" + articleId;
         /*
@@ -86,12 +86,12 @@ public class Chapter01 extends Base {
         articleData.put("user", user);
         articleData.put("now", String.valueOf(now));
         articleData.put("votes", "1");
-        conn.hmset(articleKey, articleData);
+        getConn().hmset(articleKey, articleData);
         /*
          * 将文章投票分数和投票时间添加到zset中
          */
-        conn.zadd("score:" + articleId, now + VOTE_SCORE, articleKey);
-        conn.zadd("time:" + articleId, now, articleKey);
+        getConn().zadd("score:" + articleId, now + VOTE_SCORE, articleKey);
+        getConn().zadd("time:" + articleId, now, articleKey);
         return articleId;
     }
 
@@ -104,13 +104,13 @@ public class Chapter01 extends Base {
     public void articleVote(String user, String articleId) {
         // 验证文章投票时间是否过期
         long cutoff = (System.currentTimeMillis() / 1000) - ONE_WEEK_IN_SECONDS;
-        if (conn.zscore("time:" + articleId, "article:" + articleId) < cutoff) {
+        if (getConn().zscore("time:" + articleId, "article:" + articleId) < cutoff) {
             printer("此次投票已超出该文章 [article:" + articleId + "]投票截止日期，投票失败!");
             return;
         }
-        if (conn.sadd("voted:" + articleId, user) == 1) {
-            conn.zincrby("score:" + articleId, VOTE_SCORE, "article:" + articleId);
-            conn.hincrBy("article:" + articleId, "votes", 1);
+        if (getConn().sadd("voted:" + articleId, user) == 1) {
+            getConn().zincrby("score:" + articleId, VOTE_SCORE, "article:" + articleId);
+            getConn().hincrBy("article:" + articleId, "votes", 1);
             printer("投票成功!");
         }
     }
@@ -137,10 +137,10 @@ public class Chapter01 extends Base {
         int start = (page - 1) * ARTICLES_PER_PAGE;
         int end = start + ARTICLES_PER_PAGE - 1;
         // 按照分值排序
-        Set<String> articleIds = conn.zrevrange(key, start, end);
+        Set<String> articleIds = getConn().zrevrange(key, start, end);
         List<Map<String, String>> articles = new LinkedList<>();
         for (String id : articleIds) {
-            Map<String, String> articleData = conn.hgetAll(id);
+            Map<String, String> articleData = getConn().hgetAll(id);
             articles.add(articleData);
         }
         return articles;
@@ -172,7 +172,7 @@ public class Chapter01 extends Base {
     public void addGroups(String articleId, String[] groups) {
         String article = "article:" + articleId;
         for (String group : groups) {
-            conn.sadd("group:" + group, article);
+            getConn().sadd("group:" + group, article);
         }
     }
 
@@ -199,13 +199,13 @@ public class Chapter01 extends Base {
      */
     public List<Map<String, String>> getGroupArticles(String group, int page, String score, String articleId) {
         String key = score + group;
-        if (!conn.exists(key)) {
+        if (!getConn().exists(key)) {
             /*
              * 取两集合交集，并生成新的集合
              */
             ZParams zParams = new ZParams().aggregate(ZParams.Aggregate.MAX);
-            conn.zinterstore(key, zParams, "group:" + group, score + articleId);
-            conn.expire(key, 60);
+            getConn().zinterstore(key, zParams, "group:" + group, score + articleId);
+            getConn().expire(key, 60);
         }
         return getArticles(page, key);
     }

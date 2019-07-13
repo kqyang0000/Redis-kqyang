@@ -1,6 +1,8 @@
 package com.redis.common;
 
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
 
 import java.util.Set;
 import java.util.UUID;
@@ -13,13 +15,16 @@ public class Base {
     private static final String LOCAL_HOST = "127.0.0.1";
     private static final int PORT = 6379;
     private static final int INDEX = 14;
-    protected static Jedis conn = null;
+    private static final int TIMEOUT = 2000;
+    private static JedisPool jedisPool = new JedisPool(new JedisPoolConfig(), LOCAL_HOST, PORT, TIMEOUT);
 
-    protected Base() {
-        Jedis conn = new Jedis(LOCAL_HOST, PORT);
-//        conn.auth(PASSWORD);
-        conn.select(INDEX);
-        this.conn = conn;
+    /**
+     * 获取redis客户端链接
+     *
+     * @return
+     */
+    protected Jedis getConn() {
+        return jedisPool.getResource();
     }
 
     /**
@@ -49,7 +54,7 @@ public class Base {
      * 清空库
      */
     protected void clearKeys() {
-        Set<String> keys = conn.keys("*");
-        conn.del(keys == null ? null : keys.toArray(new String[keys.size()]));
+        Set<String> keys = getConn().keys("*");
+        getConn().del(keys == null ? null : keys.toArray(new String[keys.size()]));
     }
 }
