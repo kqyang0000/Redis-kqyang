@@ -1,9 +1,7 @@
 package com.redis.chapter;
 
 import com.redis.common.Base;
-import redis.clients.jedis.BitOP;
-import redis.clients.jedis.JedisPubSub;
-import redis.clients.jedis.ZParams;
+import redis.clients.jedis.*;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -22,7 +20,12 @@ public class Chapter03 extends Base {
         /*
          * 测试redis消息发布订阅
          */
-        new Chapter03().run();
+//        new Chapter03().run();
+//        new Chapter03().clearKeys();
+        /*
+         * 测试排序
+         */
+        new Chapter03().testSort();
     }
 
     /**
@@ -322,10 +325,50 @@ public class Chapter03 extends Base {
         public void run() {
             printer(String.format("subscribe redis, channel %s, thread will be blocked", channel));
             try {
+                // 消息订阅和取消订阅要与消息发布要使用不同的jedis
                 getConn().subscribe(subscriber, channel);
             } catch (Exception e) {
                 printer(String.format("subscribe channel error, %s", e));
             }
         }
+    }
+
+    /**
+     * 测试排序
+     */
+    public void testSort() {
+        Jedis conn = getConn();
+        SortingParams params;
+        // 1.列表排序（增序）
+        conn.rpush("l-key1", "1", "3", "5", "4", "2");
+        conn.sort("l-key1");
+        // 2.消息排序（倒序）
+        params = new SortingParams();
+        params.desc();
+        conn.sort("l-key1", params);
+        // 3.按字典顺序排序
+        conn.rpush("l-key2", "b", "s", "se", "c", "a");
+        params = new SortingParams();
+        params.alpha();
+        conn.sort("l-key2", params);
+        // 4.限制返回结果数量（从索引0开始返回五个）
+        params = new SortingParams();
+        params.limit(0, 5);
+        conn.sort("l-key2", params);
+        // 5.使用外部key进行排序
+        params = new SortingParams();
+        conn.set("s-key1", "11");
+        conn.set("s-key2", "22");
+        conn.set("s-key3", "33");
+        conn.set("s-key4", "44");
+        conn.set("s-key5", "55");
+        params.by("s-key*");
+        conn.sort("l-key1", params);
+        // 6.获取外部key
+        params = new SortingParams();
+        params.get("s-key*");
+        conn.sort("l-key1", params);
+        // 7.保存排序结果
+        conn.sort("l-key1", params, "dest-key");
     }
 }

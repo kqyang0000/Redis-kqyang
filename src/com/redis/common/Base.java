@@ -17,6 +17,7 @@ public class Base {
     private static final int INDEX = 14;
     private static final int TIMEOUT = 2000;
     private static JedisPool jedisPool = new JedisPool(new JedisPoolConfig(), LOCAL_HOST, PORT, TIMEOUT);
+    private static Jedis conn = null;
 
     /**
      * 获取redis客户端链接
@@ -24,7 +25,9 @@ public class Base {
      * @return
      */
     protected Jedis getConn() {
-        return jedisPool.getResource();
+        conn = jedisPool.getResource();
+        conn.select(INDEX);
+        return conn;
     }
 
     /**
@@ -55,6 +58,9 @@ public class Base {
      */
     protected void clearKeys() {
         Set<String> keys = getConn().keys("*");
-        getConn().del(keys == null ? null : keys.toArray(new String[keys.size()]));
+        if (keys != null && keys.size() > 0) {
+            getConn().del(keys.toArray(new String[keys.size()]));
+            printer("already clear");
+        }
     }
 }
