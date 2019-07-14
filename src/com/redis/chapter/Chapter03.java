@@ -16,6 +16,7 @@ public class Chapter03 extends Base {
 //        new Chapter03().new SET();
 //        new Chapter03().new HASH();
 //        new Chapter03().new ZSET();
+//        new Chapter03().new KEYS();
 
         /*
          * 测试redis消息发布订阅
@@ -56,30 +57,31 @@ public class Chapter03 extends Base {
         }
 
         public void run() {
+            Jedis conn = getConn();
             // 1.自增（默认1）
-            getConn().incr(key);
+            conn.incr(key);
             // 2.自定义自增
-            getConn().incrBy(key, 100);
+            conn.incrBy(key, 100);
             // 3.自减（默认1）
-            getConn().decr(key);
+            conn.decr(key);
             // 4.自定义自减
-            getConn().decrBy(key, 100);
+            conn.decrBy(key, 100);
             // 5.浮点自增（v2.6 之后可用）
-            getConn().incrByFloat(key, 3.1415926);
+            conn.incrByFloat(key, 3.1415926);
             // 6.值追加（会返回追加后的value长度）
-            getConn().append(key, "6789");
+            conn.append(key, "6789");
             // 7.值截取（包含起始索引值）
-            getConn().getrange(key, 1, 3);
+            conn.getrange(key, 1, 3);
             // 8.值替换（从第offset位置开始替换为指定的value，返回替换后的value长度）
-            getConn().setrange(key, 5, "1234567");
+            conn.setrange(key, 5, "1234567");
             // 9.获取偏移量为offset的二进位的值
-            getConn().getbit(key, 5);
+            conn.getbit(key, 5);
             // 10.将位串中偏移量为offset的二进位值设置为value
-            getConn().setbit(key, 0, "1");
+            conn.setbit(key, 0, "1");
             // 11.统计二进位中值为1的二进位数量，可选定范围（此范围为字符串索引范围）
-            getConn().bitcount(key, 0, 0);
+            conn.bitcount(key, 0, 0);
             // 12.按位运算操作（AND OR XOR NOT），返回运算后的字符长度
-            getConn().bitop(BitOP.AND, "s-key", "s-key1", "s-key2");
+            conn.bitop(BitOP.AND, "s-key", "s-key1", "s-key2");
         }
     }
 
@@ -94,28 +96,29 @@ public class Chapter03 extends Base {
         }
 
         public void run() {
+            Jedis conn = getConn();
             // 1.将一个或多个值推入列表的左端，返回列表长度
-            getConn().lpush(key, new String[]{"a", "b", "c", "d"});
+            conn.lpush(key, new String[]{"a", "b", "c", "d"});
             // 2.将一个或多个值推入列表的右端，返回列表长度
-            getConn().rpush(key, new String[]{"e", "f", "g", "h"});
+            conn.rpush(key, new String[]{"e", "f", "g", "h"});
             // 3.移除并返回列表最左端的元素
-            getConn().lpop(key);
+            conn.lpop(key);
             // 4.移除并返回列表最右端的元素
-            getConn().rpop(key);
+            conn.rpop(key);
             // 5.返回列表中偏移量为offset的元素
-            getConn().lindex(key, -1);
+            conn.lindex(key, -1);
             // 6.返回范围内的列表元素，包含起始终止范围的元素
-            getConn().lrange(key, 0, -1);
+            conn.lrange(key, 0, -1);
             // 7.队列表进行修剪，保留起至终止范围内的元素
-            getConn().ltrim(key, 0, 4);
+            conn.ltrim(key, 0, 4);
             // 8.从第一个非空列表中弹出位于最左侧的元素，或者在timeout秒之内阻塞并等待可弹出的元素出现（有值则立刻弹出，否则阻塞等待）
-            getConn().blpop(20, key);
+            conn.blpop(20, key);
             // 9.从第一个非空列表中弹出位于最右侧的元素，或者在timeout秒之内阻塞并等待可弹出的元素出现（有值则立刻弹出，否则阻塞等待）
-            getConn().brpop(20, key);
+            conn.brpop(20, key);
             // 10.从列表一中弹出位于最右端的元素，然后将这个元素推入列表二的最左端，并返回这个元素
-            getConn().rpoplpush("l1", "l2");
+            conn.rpoplpush("l1", "l2");
             // 11.从列表一中弹出位于最右端的元素，然后将这个元素推入列表二的最左端，并返回这个元素，或者在timeout秒之内阻塞并等待可弹出的元素出现（有值则立刻弹出，否则阻塞等待）
-            getConn().brpoplpush("l1", "l2", 20);
+            conn.brpoplpush("l1", "l2", 20);
         }
     }
 
@@ -130,34 +133,35 @@ public class Chapter03 extends Base {
         }
 
         public void run() {
+            Jedis conn = getConn();
             // 1.将一个或多个元素添加到集合里面，返回添加元素中并不存在于集合里面的数量
-            getConn().sadd(key, "a", "b", "b");
+            conn.sadd(key, "a", "b", "b");
             // 2.从集合中移除一个或多个元素，并返回移除元素的数量
-            getConn().srem(key, "a", "b");
+            conn.srem(key, "a", "b");
             // 3.检查元素是否存在于集合中
-            getConn().sismember(key, "a");
+            conn.sismember(key, "a");
             // 4.返回集合中包含元素的数量
-            getConn().scard(key);
+            conn.scard(key);
             // 5.返回集合包含的所有元素
-            getConn().smembers(key);
+            conn.smembers(key);
             // 6.从集合里随机返回一个或多个元素，当count为正数时，返回的元素不会重复，为负数时可能会出现重复
-            getConn().srandmember(key, 3);
+            conn.srandmember(key, 3);
             // 7.随机的移除一个或多个元素，并返回该元素
-            getConn().spop(key, 2);
+            conn.spop(key, 2);
             // 8.从集合一中移除一个元素到集合二中，如果移除成功则返回1否则返回0
-            getConn().smove("s1", "s2", "a");
+            conn.smove("s1", "s2", "a");
             // 9.返回存在于第一集合但并不存在于其他集合中的元素（数学上的差集运算）
-            getConn().sdiff("s1", "s2", "s3");
+            conn.sdiff("s1", "s2", "s3");
             // 10.将存在于第一集合但不存在于其他集合的元素存储在dest集合中
-            getConn().sdiffstore("dest", "s1", "s2");
+            conn.sdiffstore("dest", "s1", "s2");
             // 11.返回同时存在于所有集合中的元素（数学上的交集运算）
-            getConn().sinter("s1", "s2", "s3");
+            conn.sinter("s1", "s2", "s3");
             // 12.返回同时存在于所有集合中的元素（数学上的交集运算）,并存储在dest集合中
-            getConn().sinterstore("dest", "s1", "s2", "s3");
+            conn.sinterstore("dest", "s1", "s2", "s3");
             // 13.返回至少存在于一个集合中的元素（数学上的并集）
-            getConn().sunion("s1", "s2", "s3");
+            conn.sunion("s1", "s2", "s3");
             // 14.返回至少存在于一个集合中的元素（数学上的并集）,并存储在dest集合中
-            getConn().sunionstore("dest", "s1", "s2");
+            conn.sunionstore("dest", "s1", "s2");
         }
     }
 
@@ -172,26 +176,27 @@ public class Chapter03 extends Base {
         }
 
         public void run() {
+            Jedis conn = getConn();
             // 1.为散列里面的一个或多个键设置值
-            getConn().hmset(key, new HashMap<>(16));
+            conn.hmset(key, new HashMap<>(16));
             // 2.从散列里面获取一个或多个键的值
-            getConn().hmget(key, "name:", "age:");
+            conn.hmget(key, "name:", "age:");
             // 3.删除散列里面的一个或多个键值对，返回成功找到并删除的键值对数量
-            getConn().hdel(key, "name", "age");
+            conn.hdel(key, "name", "age");
             // 4.返回散列包含的键值对数量
-            getConn().hlen(key);
+            conn.hlen(key);
             // 5.检查给定的键是否存在于hash散列中
-            getConn().hexists(key, "name");
+            conn.hexists(key, "name");
             // 6.获取散列包含的所有键
-            getConn().hkeys(key);
+            conn.hkeys(key);
             // 7.获取散列包含的所有值
-            getConn().hvals(key);
+            conn.hvals(key);
             // 8.获取散列包含的所有键值对
-            getConn().hgetAll(key);
+            conn.hgetAll(key);
             // 9.将键对应的值加上整数，会返回操作后的值
-            getConn().hincrBy(key, "age", 1);
+            conn.hincrBy(key, "age", 1);
             // 10.将键对应的值加上浮点数，会返回操作后的值
-            getConn().hincrByFloat(key, "weight", 2.1);
+            conn.hincrByFloat(key, "weight", 2.1);
         }
     }
 
@@ -206,38 +211,39 @@ public class Chapter03 extends Base {
         }
 
         public void run() {
+            Jedis conn = getConn();
             // 1.将带有分值的成员添加到有序集合里面
-            getConn().zadd(key, 100, "yimao");
+            conn.zadd(key, 100, "yimao");
             // 2.移除指定的成员，并返回移除的成员数量
-            getConn().zrem(key, "yimao", "ermao");
+            conn.zrem(key, "yimao", "ermao");
             // 3.返回有序集合中成员数量
-            getConn().zcard(key);
+            conn.zcard(key);
             // 4.给集合中成员加分
-            getConn().zincrby(key, 100, "yimao");
+            conn.zincrby(key, 100, "yimao");
             // 5.返回分值在min与max之间的成员数量
-            getConn().zcount(key, 102, 105);
+            conn.zcount(key, 102, 105);
             // 6.返回成员在有序集合中的排名，成员按照分值从小到大排列 最小排名：0
-            getConn().zrank(key, "yimao");
+            conn.zrank(key, "yimao");
             // 7.返回成员分值
-            getConn().zscore(key, "ermao");
+            conn.zscore(key, "ermao");
             // 8.返回集合中指定范围内的成员
-            getConn().zrange(key, 0, -1);
+            conn.zrange(key, 0, -1);
             // 9.返回有序集合成员排名，成员按照分值从大到小排列
-            getConn().zrevrank(key, "yimao");
+            conn.zrevrank(key, "yimao");
             // 10.返回有序集合给定排名范围内的成员，成员按分值从大到小排列
-            getConn().zrevrange(key, 0, -1);
+            conn.zrevrange(key, 0, -1);
             // 11.返回有序集合中分值在min与max之间的所有成员
-            getConn().zrangeByScore(key, 100, 105);
+            conn.zrangeByScore(key, 100, 105);
             // 12.返回有序集合中分值在min与max之间的所有成员，按照分值从大到小的顺序排列
-            getConn().zrevrangeByScore(key, 105, 100);
+            conn.zrevrangeByScore(key, 105, 100);
             // 13.移除有序集合中排名在start与end之间的所有成员
-            getConn().zremrangeByRank(key, 0, 1);
+            conn.zremrangeByRank(key, 0, 1);
             // 14.移除有序集合中分值在min与max之间的所有成员
-            getConn().zremrangeByScore(key, 100, 105);
+            conn.zremrangeByScore(key, 100, 105);
             // 15.对给定的有序集合执行类似数学集合中的交集运算
-            getConn().zinterstore("dest-key", new ZParams().aggregate(ZParams.Aggregate.MAX), "z1", "z2");
+            conn.zinterstore("dest-key", new ZParams().aggregate(ZParams.Aggregate.MAX), "z1", "z2");
             // 16.对给定的有序集合执行类似数学集合中的并集运算
-            getConn().zunionstore("dest-key", new ZParams().aggregate(ZParams.Aggregate.MAX), "z1", "z2");
+            conn.zunionstore("dest-key", new ZParams().aggregate(ZParams.Aggregate.MAX), "z1", "z2");
         }
     }
 
@@ -370,5 +376,35 @@ public class Chapter03 extends Base {
         conn.sort("l-key1", params);
         // 7.保存排序结果
         conn.sort("l-key1", params, "dest-key");
+    }
+
+    /**
+     * 设置键失效时间测试
+     */
+    public class KEYS {
+        private static final String KEY = "key";
+
+        public KEYS() {
+            run();
+        }
+
+        public void run() {
+            Jedis conn = getConn();
+            conn.set(KEY, "value");
+            // 1.设置key的过期时间（单位：s）
+            conn.expire(KEY, 30);
+            // 2.设置key在给定时间戳内失效（单位：s）
+            conn.expireAt(KEY, System.currentTimeMillis() / 1000);
+            // 3.查看key还有多少秒过期（如果没设置过期时间则返回-1）
+            conn.ttl(KEY);
+            // 4.设置key的过期时间（单位：ms）
+            conn.pexpire(KEY, 30000L);
+            // 5.设置key在给定时间戳内失效（单位：ms）
+            conn.pexpireAt(KEY, System.currentTimeMillis());
+            // 6.查看key还有多少毫秒过期（如果没设置过期时间则返回-1）
+            conn.pttl(KEY);
+            // 7.移除过期时间（如果没设置过期时间则返回0）
+            conn.persist(KEY);
+        }
     }
 }
