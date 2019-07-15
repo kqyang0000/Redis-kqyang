@@ -2,6 +2,7 @@ package com.redis.chapter;
 
 import com.google.gson.Gson;
 import com.redis.common.Base;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Tuple;
 
 import java.net.MalformedURLException;
@@ -162,6 +163,7 @@ public class Chapter02 extends Base {
      * 测试缓存行数据
      */
     public void testCacheRows() throws InterruptedException {
+        Jedis conn = getConn();
         printer("\n----- testCacheRows -----");
         printer("First, let's schedule caching of itemX every 5 seconds");
 
@@ -174,7 +176,7 @@ public class Chapter02 extends Base {
         /*
          * 打印行
          */
-        Set<Tuple> s = getConn().zrangeWithScores("schedule:", 0, -1);
+        Set<Tuple> s = conn.zrangeWithScores("schedule:", 0, -1);
         for (Tuple tuple : s) {
             printer(tuple.getElement() + ", " + (float) tuple.getScore());
         }
@@ -186,7 +188,7 @@ public class Chapter02 extends Base {
 
         Thread.sleep(1000);
         printer("Our cached data looks like:");
-        String r = getConn().get("inv:itemX");
+        String r = conn.get("inv:itemX");
         printer(r);
         assert r != null;
         printer();
@@ -194,7 +196,7 @@ public class Chapter02 extends Base {
         printer("We'll check again in 5 seconds...");
         Thread.sleep(5000);
         printer("Notice that the data has changed...");
-        String r2 = getConn().get("inv:itemX");
+        String r2 = conn.get("inv:itemX");
         printer(r2);
         printer();
         assert r2 != null;
@@ -203,7 +205,7 @@ public class Chapter02 extends Base {
         printer("Let's force un-caching");
         scheduleRowCache("itemX", -1);
         Thread.sleep(1000);
-        r = getConn().get("inv:itemX");
+        r = conn.get("inv:itemX");
         printer("The cache was cleared? " + (r == null));
         assert r == null;
 
@@ -223,26 +225,27 @@ public class Chapter02 extends Base {
      * @param item
      */
     public void updateToken(String token, String user, String item) {
+        Jedis conn = getConn();
         long timestamp = System.currentTimeMillis() / 1000;
-        getConn().hset("login:", token, user);
-        getConn().zadd("recent:", timestamp, token);
+        conn.hset("login:", token, user);
+        conn.zadd("recent:", timestamp, token);
         if (item != null) {
-            getConn().zadd("viewed:" + token, timestamp, item);
+            conn.zadd("viewed:" + token, timestamp, item);
             /*
              * 移除排序集合中区间内的成员
              *     eg:  1  2  3  4  5  6  7  8  9
              *  index:  0  1  2  3  4  5  6  7  8
              * -index: -9 -8 -7 -6 -5 -4 -3 -2  -1
-             * getConn().zremrangeByRank(key,0,-7)
+             * conn.zremrangeByRank(key,0,-7)
              * result:           4  5  6  7  8  9
              * formula: 0,-(saveCount+1)
              */
-            getConn().zremrangeByRank("viewed:" + token, 0, -26);
+            conn.zremrangeByRank("viewed:" + token, 0, -26);
             /*
              * 网页分析，新添加的代码
              * 作用：用户浏览量越多，则score值越小，则当前商品越在有序集合上面的位置
              */
-            getConn().zincrby("viewed:", -1, item);
+            conn.zincrby("viewed:", -1, item);
         }
     }
 
@@ -260,6 +263,7 @@ public class Chapter02 extends Base {
      * 清理session线程
      */
     public class CleanSessionsThread extends Thread {
+        Jedis conn = getConn();
         private int limit;
         private boolean quit;
 
@@ -274,7 +278,7 @@ public class Chapter02 extends Base {
         @Override
         public void run() {
             while (!quit) {
-                long size = getConn().zcard("recent:");
+                long size = conn.zcard("recent:");
                 if (size <= limit) {
                     try {
                         sleep(1000);
@@ -285,16 +289,16 @@ public class Chapter02 extends Base {
                 }
 
                 long endIndex = Math.min(size - limit, 100);
-                Set<String> tokenSet = getConn().zrange("recent:", 0, endIndex - 1);
+                Set<String> tokenSet = conn.zrange("recent:", 0, endIndex - 1);
                 String[] tokens = tokenSet.toArray(new String[tokenSet.size()]);
 
                 List<Object> sessionKeys = new LinkedList<>();
                 for (String token : tokens) {
                     sessionKeys.add("viewed:" + token);
                 }
-                getConn().del(sessionKeys.toArray(new String[sessionKeys.size()]));
-                getConn().hdel("login:", tokens);
-                getConn().zrem("recent:", tokens);
+                conn.del(sessionKeys.toArray(new String[sessionKeys.size()]));
+                conn.hdel("login:", tokens);
+                conn.zrem("recent:", tokens);
             }
         }
     }
@@ -318,6 +322,7 @@ public class Chapter02 extends Base {
      * 清理购物车线程
      */
     public class CleanFullSessionThread extends Thread {
+        Jedis conn = getConn();
         private int limit;
         private boolean quit;
 
@@ -332,7 +337,7 @@ public class Chapter02 extends Base {
         @Override
         public void run() {
             while (!quit) {
-                long size = getConn().zcard("recent:");
+                long size = conn.zcard("recent:");
                 if (size <= limit) {
                     try {
                         sleep(1000);
@@ -343,7 +348,7 @@ public class Chapter02 extends Base {
                 }
 
                 long endIndex = Math.min(size - limit, 100);
-                Set<String> sessionSet = getConn().zrange("recent:", 0, endIndex - 1);
+                Set<String> sessionSet = conn.zrange("recent:", 0, endIndex - 1);
                 String[] sessions = sessionSet.toArray(new String[sessionSet.size()]);
 
                 List<String> sessionKeys = new LinkedList<>();
@@ -352,9 +357,9 @@ public class Chapter02 extends Base {
                     sessionKeys.add("cart:" + session);
                 }
 
-                getConn().del(sessionKeys.toArray(new String[sessionKeys.size()]));
-                getConn().hdel("login:", sessions);
-                getConn().zrem("recent:", sessions);
+                conn.del(sessionKeys.toArray(new String[sessionKeys.size()]));
+                conn.hdel("login:", sessions);
+                conn.zrem("recent:", sessions);
             }
         }
     }
@@ -375,16 +380,17 @@ public class Chapter02 extends Base {
      * @return
      */
     public String cacheRequest(String request, Callback callback, String token) {
+        Jedis conn = getConn();
         if (!canCache(request, token)) {
             return callback != null ? callback.call(request) : null;
         }
 
         String pageKey = "cache:" + hashRequest(request);
-        String content = getConn().get(pageKey);
+        String content = conn.get(pageKey);
 
         if (content == null && callback != null) {
             content = callback.call(request);
-            getConn().setex(pageKey, 300, content);
+            conn.setex(pageKey, 300, content);
         }
         return content;
     }
@@ -456,14 +462,16 @@ public class Chapter02 extends Base {
      * @param delay
      */
     public void scheduleRowCache(String rowId, int delay) {
-        getConn().zadd("delay:", delay, rowId);
-        getConn().zadd("schedule:", System.currentTimeMillis() / 1000, rowId);
+        Jedis conn = getConn();
+        conn.zadd("delay:", delay, rowId);
+        conn.zadd("schedule:", System.currentTimeMillis() / 1000, rowId);
     }
 
     /**
      * 缓存行线程
      */
     public class CacheRowsThread extends Thread {
+        Jedis conn = getConn();
         private boolean quit;
 
         public void quit() {
@@ -474,7 +482,7 @@ public class Chapter02 extends Base {
         public void run() {
             Gson gson = new Gson();
             while (!quit) {
-                Set<Tuple> range = getConn().zrangeWithScores("schedule:", 0, 0);
+                Set<Tuple> range = conn.zrangeWithScores("schedule:", 0, 0);
                 Tuple next = range.size() > 0 ? range.iterator().next() : null;
                 long now = System.currentTimeMillis() / 1000;
                 if (next == null || next.getScore() > now) {
@@ -487,17 +495,17 @@ public class Chapter02 extends Base {
                 }
 
                 String rowId = next.getElement();
-                Double delay = getConn().zscore("delay:", rowId);
+                Double delay = conn.zscore("delay:", rowId);
                 if (delay <= 0) {
-                    getConn().zrem("delay:", rowId);
-                    getConn().zrem("schedule:", rowId);
-                    getConn().del("inv:" + rowId);
+                    conn.zrem("delay:", rowId);
+                    conn.zrem("schedule:", rowId);
+                    conn.del("inv:" + rowId);
                     continue;
                 }
 
                 Inventory row = Inventory.get(rowId);
-                getConn().zadd("schedule:", now + delay, rowId);
-                getConn().set("inv:" + rowId, gson.toJson(row));
+                conn.zadd("schedule:", now + delay, rowId);
+                conn.set("inv:" + rowId, gson.toJson(row));
             }
         }
     }

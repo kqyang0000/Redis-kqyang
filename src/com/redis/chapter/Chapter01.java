@@ -1,6 +1,7 @@
 package com.redis.chapter;
 
 import com.redis.common.Base;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.ZParams;
 
 import java.util.*;
@@ -66,13 +67,14 @@ public class Chapter01 extends Base {
      * @return
      */
     public String postArticle(String user, String title, String link) {
-        String articleId = String.valueOf(getConn().incr("article:"));
+        Jedis conn = getConn();
+        String articleId = String.valueOf(conn.incr("article:"));
         /*
          * 以投票id为键user为值，添加到set集合，并设置投票过期时间（一周）
          */
         String voted = "voted:" + articleId;
-        getConn().sadd(voted, user);
-        getConn().expire(voted, ONE_WEEK_IN_SECONDS);
+        conn.sadd(voted, user);
+        conn.expire(voted, ONE_WEEK_IN_SECONDS);
         long now = System.currentTimeMillis() / 1000;
         String articleKey = "article:" + articleId;
         /*
@@ -86,12 +88,12 @@ public class Chapter01 extends Base {
         articleData.put("user", user);
         articleData.put("now", String.valueOf(now));
         articleData.put("votes", "1");
-        getConn().hmset(articleKey, articleData);
+        conn.hmset(articleKey, articleData);
         /*
          * 将文章投票分数和投票时间添加到zset中
          */
-        getConn().zadd("score:" + articleId, now + VOTE_SCORE, articleKey);
-        getConn().zadd("time:" + articleId, now, articleKey);
+        conn.zadd("score:" + articleId, now + VOTE_SCORE, articleKey);
+        conn.zadd("time:" + articleId, now, articleKey);
         return articleId;
     }
 
@@ -102,15 +104,16 @@ public class Chapter01 extends Base {
      * @param articleId
      */
     public void articleVote(String user, String articleId) {
+        Jedis conn = getConn();
         // 验证文章投票时间是否过期
         long cutoff = (System.currentTimeMillis() / 1000) - ONE_WEEK_IN_SECONDS;
-        if (getConn().zscore("time:" + articleId, "article:" + articleId) < cutoff) {
+        if (conn.zscore("time:" + articleId, "article:" + articleId) < cutoff) {
             printer("此次投票已超出该文章 [article:" + articleId + "]投票截止日期，投票失败!");
             return;
         }
-        if (getConn().sadd("voted:" + articleId, user) == 1) {
-            getConn().zincrby("score:" + articleId, VOTE_SCORE, "article:" + articleId);
-            getConn().hincrBy("article:" + articleId, "votes", 1);
+        if (conn.sadd("voted:" + articleId, user) == 1) {
+            conn.zincrby("score:" + articleId, VOTE_SCORE, "article:" + articleId);
+            conn.hincrBy("article:" + articleId, "votes", 1);
             printer("投票成功!");
         }
     }
@@ -134,13 +137,14 @@ public class Chapter01 extends Base {
      * @return
      */
     public List<Map<String, String>> getArticles(int page, String key, String articleId) {
+        Jedis conn = getConn();
         int start = (page - 1) * ARTICLES_PER_PAGE;
         int end = start + ARTICLES_PER_PAGE - 1;
         // 按照分值排序
-        Set<String> articleIds = getConn().zrevrange(key, start, end);
+        Set<String> articleIds = conn.zrevrange(key, start, end);
         List<Map<String, String>> articles = new LinkedList<>();
         for (String id : articleIds) {
-            Map<String, String> articleData = getConn().hgetAll(id);
+            Map<String, String> articleData = conn.hgetAll(id);
             articles.add(articleData);
         }
         return articles;
@@ -198,14 +202,15 @@ public class Chapter01 extends Base {
      * @return
      */
     public List<Map<String, String>> getGroupArticles(String group, int page, String score, String articleId) {
+        Jedis conn = getConn();
         String key = score + group;
-        if (!getConn().exists(key)) {
+        if (!conn.exists(key)) {
             /*
              * 取两集合交集，并生成新的集合
              */
             ZParams zParams = new ZParams().aggregate(ZParams.Aggregate.MAX);
-            getConn().zinterstore(key, zParams, "group:" + group, score + articleId);
-            getConn().expire(key, 60);
+            conn.zinterstore(key, zParams, "group:" + group, score + articleId);
+            conn.expire(key, 60);
         }
         return getArticles(page, key);
     }
