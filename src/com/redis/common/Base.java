@@ -17,17 +17,27 @@ public class Base {
     private static final int INDEX = 14;
     private static final int TIMEOUT = 2000;
     private static JedisPool jedisPool = new JedisPool(new JedisPoolConfig(), LOCAL_HOST, PORT, TIMEOUT);
-    private static Jedis conn = null;
 
     /**
      * 获取redis客户端链接
      *
      * @return
      */
-    protected Jedis getConn() {
-        conn = jedisPool.getResource();
+    protected static Jedis getConn() {
+        Jedis conn = jedisPool.getResource();
         conn.select(INDEX);
         return conn;
+    }
+
+    /**
+     * 关闭客户端链接
+     *
+     * @param conn
+     */
+    protected void returnConn(Jedis conn) {
+        if (conn != null && jedisPool != null) {
+            jedisPool.returnResource(conn);
+        }
     }
 
     /**

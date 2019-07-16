@@ -2,6 +2,7 @@ package com.redis.chapter;
 
 import com.redis.common.Base;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.Transaction;
 import redis.clients.jedis.Tuple;
 
@@ -12,6 +13,7 @@ import java.util.Map;
 import java.util.Set;
 
 public class Chapter04 extends Base {
+    private static final Jedis conn = getConn();
 
     public static void main(String[] args) {
         new Chapter04().run();
@@ -21,19 +23,18 @@ public class Chapter04 extends Base {
         /*
          * 上架
          */
-        testListItem(false);
+//        testListItem(false);
         /*
          * 购买
          */
-        testPurchaseItem();
+//        testPurchaseItem();
         /*
-         *
+         * 测试流水线方式执行redis命令
          */
         testBenchmarkUploadToken();
     }
 
     public void testListItem(boolean nested) {
-        Jedis conn = getConn();
         if (!nested) {
             printer("\n----- testListItem -----");
         }
@@ -73,7 +74,6 @@ public class Chapter04 extends Base {
      * @return
      */
     public boolean listItem(String itemId, String sellerId, double price) {
-        Jedis conn = getConn();
         String inventory = "inventory:" + sellerId;
         String item = itemId + '.' + sellerId;
         long end = System.currentTimeMillis() + 5000;
@@ -101,7 +101,6 @@ public class Chapter04 extends Base {
     }
 
     public void testPurchaseItem() {
-        Jedis conn = getConn();
         printer("\n----- testPurchaseItem -----");
         testListItem(true);
 
@@ -149,7 +148,6 @@ public class Chapter04 extends Base {
      * @param lprice
      */
     public boolean purchaseItem(String buyerId, String itemId, String sellerId, double lprice) {
-        Jedis conn = getConn();
         String buyer = "users:" + buyerId;
         String seller = "users:" + sellerId;
         String item = itemId + "." + sellerId;
@@ -184,9 +182,23 @@ public class Chapter04 extends Base {
 
     public void testBenchmarkUploadToken() {
         printer("\n----- testBenchmarkUpdate -----");
-        benchmarkUploadToken(5);
+        benchmarkUploadToken(30);
     }
 
+    /**
+     * 测试redis 流水线执行方式
+     * 带宽: 10M   cup: 4核   内存: 16G
+     * ---------------------------total---time-avg---
+     * in 5s: updateToken         5992    5    1198  |
+     *        updateTokenPipeline 132622  5    26524 |
+     * ---------------------------total---time-avg---|
+     * in 15s: updateToken        18373   15   1224  |
+     *        updateTokenPipeline 470706  15   31380 |
+     * ---------------------------total---time-avg---|
+     * in 30s: updateToken        39521   30   1317  |
+     *        updateTokenPipeline 922061  30   30735 |
+     * ----------------------------------------------
+     */
     public void benchmarkUploadToken(int duration) {
         try {
             Class[] args = new Class[]{
@@ -215,22 +227,47 @@ public class Chapter04 extends Base {
             e.printStackTrace();
         } catch (InvocationTargetException e) {
             e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
+
+    /**
+     * 分步执行
+     *
+     * @param token
+     * @param user
+     * @param item
+     */
+    public void updateToken(String token, String user, String item) {
+        long timestamp = System.currentTimeMillis() / 1000;
+        conn.hset("login:", token, user);
+        conn.zadd("recent:", timestamp, token);
+        if (item != null) {
+            conn.zadd("viewed:" + token, timestamp, token);
+            conn.zremrangeByRank("viewed:" + token, 0, -26);
+            conn.zincrby("viewed:", -1, item);
+        }
+    }
+
+    /**
+     * 流水线方式执行
+     *
+     * @param token
+     * @param user
+     * @param item
+     */
+    public void updateTokenPipeline(String token, String user, String item) {
+        long timestamp = System.currentTimeMillis() / 1000;
+        Pipeline pipe = conn.pipelined();
+        pipe.multi();
+        pipe.hset("login:", token, user);
+        pipe.zadd("recent:", timestamp, token);
+        if (item != null) {
+            pipe.zadd("viewed:" + token, timestamp, token);
+            pipe.zremrangeByRank("viewed:" + token, 0, -26);
+            pipe.zincrby("viewed:", -1, item);
+        }
+        pipe.exec();
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

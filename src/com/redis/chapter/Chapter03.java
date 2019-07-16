@@ -9,6 +9,7 @@ import java.io.InputStreamReader;
 import java.util.HashMap;
 
 public class Chapter03 extends Base {
+    private static final Jedis conn = getConn();
 
     public static void main(String[] args) {
 //        new Chapter03().new STRING();
@@ -57,7 +58,6 @@ public class Chapter03 extends Base {
         }
 
         public void run() {
-            Jedis conn = getConn();
             // 1.自增（默认1）
             conn.incr(key);
             // 2.自定义自增
@@ -96,7 +96,6 @@ public class Chapter03 extends Base {
         }
 
         public void run() {
-            Jedis conn = getConn();
             // 1.将一个或多个值推入列表的左端，返回列表长度
             conn.lpush(key, new String[]{"a", "b", "c", "d"});
             // 2.将一个或多个值推入列表的右端，返回列表长度
@@ -133,7 +132,6 @@ public class Chapter03 extends Base {
         }
 
         public void run() {
-            Jedis conn = getConn();
             // 1.将一个或多个元素添加到集合里面，返回添加元素中并不存在于集合里面的数量
             conn.sadd(key, "a", "b", "b");
             // 2.从集合中移除一个或多个元素，并返回移除元素的数量
@@ -176,7 +174,6 @@ public class Chapter03 extends Base {
         }
 
         public void run() {
-            Jedis conn = getConn();
             // 1.为散列里面的一个或多个键设置值
             conn.hmset(key, new HashMap<>(16));
             // 2.从散列里面获取一个或多个键的值
@@ -211,7 +208,6 @@ public class Chapter03 extends Base {
         }
 
         public void run() {
-            Jedis conn = getConn();
             // 1.将带有分值的成员添加到有序集合里面
             conn.zadd(key, 100, "yimao");
             // 2.移除指定的成员，并返回移除的成员数量
@@ -264,7 +260,7 @@ public class Chapter03 extends Base {
                 try {
                     line = reader.readLine();
                     if (!"quit".equals(line)) {
-                        getConn().publish("mychannel", line);
+                        conn.publish("mychannel", line);
                     } else {
                         break;
                     }
@@ -332,7 +328,7 @@ public class Chapter03 extends Base {
             printer(String.format("subscribe redis, channel %s, thread will be blocked", channel));
             try {
                 // 消息订阅和取消订阅要与消息发布要使用不同的jedis
-                getConn().subscribe(subscriber, channel);
+                conn.subscribe(subscriber, channel);
             } catch (Exception e) {
                 printer(String.format("subscribe channel error, %s", e));
             }
@@ -343,7 +339,6 @@ public class Chapter03 extends Base {
      * 测试排序
      */
     public void testSort() {
-        Jedis conn = getConn();
         SortingParams params;
         // 1.列表排序（增序）
         conn.rpush("l-key1", "1", "3", "5", "4", "2");
@@ -389,7 +384,6 @@ public class Chapter03 extends Base {
         }
 
         public void run() {
-            Jedis conn = getConn();
             conn.set(KEY, "value");
             // 1.设置key的过期时间（单位：s）
             conn.expire(KEY, 30);

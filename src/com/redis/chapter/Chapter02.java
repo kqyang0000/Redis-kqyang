@@ -10,6 +10,7 @@ import java.net.URL;
 import java.util.*;
 
 public class Chapter02 extends Base {
+    private static final Jedis conn = getConn();
 
     public static void main(String[] args) throws InterruptedException {
         new Chapter02().run();
@@ -71,7 +72,7 @@ public class Chapter02 extends Base {
             throw new RuntimeException("The clean session thread is still alive!");
         }
 
-        long s = getConn().hlen("login:");
+        long s = conn.hlen("login:");
         printer("The current number of sessions still available is:" + s);
         assert s == 0;
     }
@@ -97,7 +98,7 @@ public class Chapter02 extends Base {
         /*
          * 获取购物车中所有商品
          */
-        Map<String, String> items = getConn().hgetAll("cart:" + token);
+        Map<String, String> items = conn.hgetAll("cart:" + token);
         printer("Our shopping cart currently has:");
         for (Map.Entry<String, String> entry : items.entrySet()) {
             printer(entry.getKey() + ":" + entry.getValue());
@@ -121,7 +122,7 @@ public class Chapter02 extends Base {
         /*
          * 获取购物车中所有商品
          */
-        items = getConn().hgetAll("cart:" + token);
+        items = conn.hgetAll("cart:" + token);
         printer("Our shopping cart now contains");
         for (Map.Entry<String, String> entry : items.entrySet()) {
             printer(entry.getKey() + ":" + entry.getValue());
@@ -163,7 +164,6 @@ public class Chapter02 extends Base {
      * 测试缓存行数据
      */
     public void testCacheRows() throws InterruptedException {
-        Jedis conn = getConn();
         printer("\n----- testCacheRows -----");
         printer("First, let's schedule caching of itemX every 5 seconds");
 
@@ -225,7 +225,6 @@ public class Chapter02 extends Base {
      * @param item
      */
     public void updateToken(String token, String user, String item) {
-        Jedis conn = getConn();
         long timestamp = System.currentTimeMillis() / 1000;
         conn.hset("login:", token, user);
         conn.zadd("recent:", timestamp, token);
@@ -256,14 +255,13 @@ public class Chapter02 extends Base {
      * @return
      */
     public String checkToken(String token) {
-        return getConn().hget("login:", token);
+        return conn.hget("login:", token);
     }
 
     /**
      * 清理session线程
      */
     public class CleanSessionsThread extends Thread {
-        Jedis conn = getConn();
         private int limit;
         private boolean quit;
 
@@ -312,9 +310,9 @@ public class Chapter02 extends Base {
      */
     public void addToCart(String session, String item, int count) {
         if (count <= 0) {
-            getConn().hdel("cart:" + session, item);
+            conn.hdel("cart:" + session, item);
         } else {
-            getConn().hset("cart:" + session, item, String.valueOf(count));
+            conn.hset("cart:" + session, item, String.valueOf(count));
         }
     }
 
@@ -322,7 +320,6 @@ public class Chapter02 extends Base {
      * 清理购物车线程
      */
     public class CleanFullSessionThread extends Thread {
-        Jedis conn = getConn();
         private int limit;
         private boolean quit;
 
@@ -380,7 +377,6 @@ public class Chapter02 extends Base {
      * @return
      */
     public String cacheRequest(String request, Callback callback, String token) {
-        Jedis conn = getConn();
         if (!canCache(request, token)) {
             return callback != null ? callback.call(request) : null;
         }
@@ -417,7 +413,7 @@ public class Chapter02 extends Base {
             if (itemId == null || isDynamic(params)) {
                 return false;
             }
-            Long rank = getConn().zrank("viewed:" + token, itemId);
+            Long rank = conn.zrank("viewed:" + token, itemId);
             return rank != null && rank < 10000;
         } catch (MalformedURLException e) {
             printer("canCache method exception: " + e.getMessage());
@@ -462,7 +458,6 @@ public class Chapter02 extends Base {
      * @param delay
      */
     public void scheduleRowCache(String rowId, int delay) {
-        Jedis conn = getConn();
         conn.zadd("delay:", delay, rowId);
         conn.zadd("schedule:", System.currentTimeMillis() / 1000, rowId);
     }
@@ -471,7 +466,6 @@ public class Chapter02 extends Base {
      * 缓存行线程
      */
     public class CacheRowsThread extends Thread {
-        Jedis conn = getConn();
         private boolean quit;
 
         public void quit() {

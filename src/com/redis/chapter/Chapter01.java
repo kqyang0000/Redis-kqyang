@@ -7,6 +7,7 @@ import redis.clients.jedis.ZParams;
 import java.util.*;
 
 public class Chapter01 extends Base {
+    private static final Jedis conn = getConn();
     private static final int ONE_WEEK_IN_SECONDS = 7 * 86400;
     private static final int VOTE_SCORE = 432;
     private static final int ARTICLES_PER_PAGE = 25;
@@ -25,7 +26,7 @@ public class Chapter01 extends Base {
         /*
          * 获取文章详情
          */
-        Map<String, String> articleData = getConn().hgetAll("article:" + articleId);
+        Map<String, String> articleData = conn.hgetAll("article:" + articleId);
         for (Map.Entry<String, String> entry : articleData.entrySet()) {
             printer(entry.getKey() + ":" + entry.getValue());
         }
@@ -35,7 +36,7 @@ public class Chapter01 extends Base {
          * b.打印投票数
          */
         articleVote("other_user", articleId);
-        String votes = getConn().hget("article:" + articleId, "votes");
+        String votes = conn.hget("article:" + articleId, "votes");
         printer("We voted for the article, it now has votes:" + votes);
         assert Integer.parseInt(votes) > 1;
         /*
@@ -67,7 +68,6 @@ public class Chapter01 extends Base {
      * @return
      */
     public String postArticle(String user, String title, String link) {
-        Jedis conn = getConn();
         String articleId = String.valueOf(conn.incr("article:"));
         /*
          * 以投票id为键user为值，添加到set集合，并设置投票过期时间（一周）
@@ -104,7 +104,6 @@ public class Chapter01 extends Base {
      * @param articleId
      */
     public void articleVote(String user, String articleId) {
-        Jedis conn = getConn();
         // 验证文章投票时间是否过期
         long cutoff = (System.currentTimeMillis() / 1000) - ONE_WEEK_IN_SECONDS;
         if (conn.zscore("time:" + articleId, "article:" + articleId) < cutoff) {
@@ -137,7 +136,6 @@ public class Chapter01 extends Base {
      * @return
      */
     public List<Map<String, String>> getArticles(int page, String key, String articleId) {
-        Jedis conn = getConn();
         int start = (page - 1) * ARTICLES_PER_PAGE;
         int end = start + ARTICLES_PER_PAGE - 1;
         // 按照分值排序
@@ -176,7 +174,7 @@ public class Chapter01 extends Base {
     public void addGroups(String articleId, String[] groups) {
         String article = "article:" + articleId;
         for (String group : groups) {
-            getConn().sadd("group:" + group, article);
+            conn.sadd("group:" + group, article);
         }
     }
 
@@ -202,7 +200,6 @@ public class Chapter01 extends Base {
      * @return
      */
     public List<Map<String, String>> getGroupArticles(String group, int page, String score, String articleId) {
-        Jedis conn = getConn();
         String key = score + group;
         if (!conn.exists(key)) {
             /*
