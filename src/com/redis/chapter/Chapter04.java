@@ -1,6 +1,6 @@
 package com.redis.chapter;
 
-import com.redis.common.Base;
+import com.redis.common.RedisHandler;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.Transaction;
@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class Chapter04 extends Base {
+public class Chapter04 extends RedisHandler {
     private static final Jedis conn = getConn();
 
     public static void main(String[] args) {

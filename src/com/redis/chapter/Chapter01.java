@@ -1,12 +1,12 @@
 package com.redis.chapter;
 
-import com.redis.common.Base;
+import com.redis.common.RedisHandler;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.ZParams;
 
 import java.util.*;
 
-public class Chapter01 extends Base {
+public class Chapter01 extends RedisHandler {
     private static final Jedis conn = getConn();
     private static final int ONE_WEEK_IN_SECONDS = 7 * 86400;
     private static final int VOTE_SCORE = 432;

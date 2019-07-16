@@ -1,7 +1,7 @@
 package com.redis.chapter;
 
 import com.google.gson.Gson;
-import com.redis.common.Base;
+import com.redis.common.RedisHandler;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Tuple;
 
@@ -9,7 +9,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
 
-public class Chapter02 extends Base {
+public class Chapter02 extends RedisHandler {
     private static final Jedis conn = getConn();
 
     public static void main(String[] args) throws InterruptedException {

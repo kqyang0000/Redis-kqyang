@@ -1,6 +1,6 @@
 package com.redis.chapter;
 
-import com.redis.common.Base;
+import com.redis.common.RedisHandler;
 import redis.clients.jedis.*;
 
 import java.io.BufferedReader;
@@ -8,7 +8,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.HashMap;
 
-public class Chapter03 extends Base {
+public class Chapter03 extends RedisHandler {
     private static final Jedis conn = getConn();
 
     public static void main(String[] args) {
