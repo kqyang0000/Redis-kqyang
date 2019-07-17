@@ -256,6 +256,9 @@ public class Chapter04 extends RedisHandler {
      * @param token
      * @param user
      * @param item
+     *
+     * 带事物     pipe.multi() --> pipe.exec()
+     * 不带事物   pipe.sync()
      */
     public void updateTokenPipeline(String token, String user, String item) {
         long timestamp = System.currentTimeMillis() / 1000;
