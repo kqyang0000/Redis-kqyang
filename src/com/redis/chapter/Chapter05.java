@@ -2,11 +2,18 @@ package com.redis.chapter;
 
 import com.redis.common.RedisHandler;
 import javafx.util.Pair;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.Transaction;
 import redis.clients.jedis.Tuple;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.text.Collator;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -22,12 +29,13 @@ public class Chapter05 extends RedisHandler {
         ISO_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
     }
 
-    public static void main(String[] args) throws InterruptedException {
-        new Chapter05().run();
+    public static void main(String[] args) {
+        File file = new File("/Users/yangkaiqiang/Documents/data/GeoLiteCity-Blocks.csv");
+        new Chapter05().importIpsToRedis(file);
     }
 
     public void run() throws InterruptedException {
-//        testLogRecent();
+        testLogRecent();
         testLogCommon();
         testCounters();
 
@@ -328,6 +336,119 @@ public class Chapter05 extends RedisHandler {
         public int bisectRight(List<String> values, String key) {
             int index = Collections.binarySearch(values, key);
             return index < 0 ? Math.abs(index) - 1 : index + 1;
+        }
+    }
+
+    /**
+     * change ip to score
+     *
+     * @param ip
+     */
+    public int ipToScore(String ip) {
+        int score = 0;
+        if (ip == null) {
+            return score;
+        }
+        for (String s : ip.split(".")) {
+            /*
+             * radix 为转换基数，可用基数为：2 8 10 16
+             * 例如：
+             *      Integer.parseInt("100", 2) as 4
+             *      Integer.parseInt("100", 8) as 64
+             *      Integer.parseInt("100", 10) as 100
+             *      Integer.parseInt("100", 16) as 256
+             */
+            score = score * 256 + Integer.parseInt(s, 10);
+        }
+        return score;
+    }
+
+    /**
+     * import data to redis
+     *
+     * @param file
+     */
+    public void importIpsToRedis(File file) {
+        FileReader reader = null;
+        try {
+            reader = new FileReader(file);
+            CSVParser parser = new CSVParser(reader, CSVFormat.DEFAULT);
+            int count = 0;
+            /*
+             * get all records
+             */
+            List<CSVRecord> recordList = parser.getRecords();
+            Pipeline pipe = null;
+            boolean quit = false;
+            for (CSVRecord record : recordList) {
+                if (count == 0) {
+                    pipe = conn.pipelined();
+                }
+                /*
+                 * 将count用作计数器使用，当count大于2时（因为前两行是表头）开始获取数据
+                 */
+                if (++count <= 2) {
+                    continue;
+                }
+                printer("currentNum: " + count);
+                /*
+                 * 获取IP起始号和IP终止号，由于多个IP号段可能对应一个城市ID，因此将此号段内左右IP号循环添加到redis中，
+                 * 又因为多个IP号段可能为同一个城市ID，所以将计数器的值拼接在城市ID后
+                 *
+                 * 表格样式如： startIpNum endIpNum locId
+                 */
+                int startNum = Integer.parseInt(record.get(0), 10);
+                int endNum = Integer.parseInt(record.get(1), 10);
+                String cityNo = record.get(2);
+                for (int next = startNum; next <= endNum; next++) {
+                    count++;
+                    pipe.zadd("ip2CityId:", next, cityNo + "_" + count);
+                    /*
+                     * pipeline如果积压了太多写操作，会导致长时间无法提交插入，导致pipeline操作被服务器强行终止，
+                     * 自测还会导致redis服务器宕机，所以这里只要操作超过一百万条就提交一次，关闭连接后再重新获取链接
+                     */
+                    if (count >= 1000000 && (count % 1000000 == 0)) {
+                        printer("已插入: " + count);
+                        pipe.sync();
+                        if (pipe != null) {
+                            printer("pipe close! And restart...");
+                            pipe.close();
+                        }
+                        /*
+                         * 由于远程服务器内存有限，当前2G内存在保存了550万条数据以后就无法再写入数据，导致redis服务
+                         * 器宕机，所以现只写入150万条数据以供测试使用
+                         */
+                        if (count >= 1500000) {
+                            quit = true;
+                            break;
+                        }
+                        pipe = conn.pipelined();
+                        Thread.sleep(2000);
+                    }
+                }
+                if (quit) {
+                    printer("数据复制人为终止...");
+                    break;
+                }
+            }
+            if (pipe != null) {
+                pipe.sync();
+                pipe.close();
+            }
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 }
