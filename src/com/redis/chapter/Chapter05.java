@@ -1,5 +1,6 @@
 package com.redis.chapter;
 
+import com.google.gson.Gson;
 import com.redis.common.RedisHandler;
 import javafx.util.Pair;
 import org.apache.commons.csv.CSVFormat;
@@ -29,15 +30,15 @@ public class Chapter05 extends RedisHandler {
         ISO_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
     }
 
-    public static void main(String[] args) {
-        File file = new File("/Users/yangkaiqiang/Documents/data/GeoLiteCity-Blocks.csv");
-        new Chapter05().importIpsToRedis(file);
+    public static void main(String[] args) throws InterruptedException {
+        new Chapter05().run();
     }
 
     public void run() throws InterruptedException {
         testLogRecent();
         testLogCommon();
         testCounters();
+        testIpLookup();
 
     }
 
@@ -349,7 +350,7 @@ public class Chapter05 extends RedisHandler {
         if (ip == null) {
             return score;
         }
-        for (String s : ip.split(".")) {
+        for (String s : ip.split("\\.")) {
             /*
              * radix 为转换基数，可用基数为：2 8 10 16
              * 例如：
@@ -373,73 +374,72 @@ public class Chapter05 extends RedisHandler {
         try {
             reader = new FileReader(file);
             CSVParser parser = new CSVParser(reader, CSVFormat.DEFAULT);
-            int count = 0;
             /*
              * get all records
              */
             List<CSVRecord> recordList = parser.getRecords();
-            Pipeline pipe = null;
-            boolean quit = false;
-            for (CSVRecord record : recordList) {
-                if (count == 0) {
-                    pipe = conn.pipelined();
-                }
+            Pipeline pipe = conn.pipelined();
+            for (int i = 0; i < recordList.size(); i++) {
                 /*
-                 * 将count用作计数器使用，当count大于2时（因为前两行是表头）开始获取数据
+                 * 当i大于2时（因为前两行是表头）开始获取数据
                  */
-                if (++count <= 2) {
+                if (i <= 1) {
                     continue;
                 }
-                printer("currentNum: " + count);
+                printer("currentNum: " + i);
                 /*
-                 * 获取IP起始号和IP终止号，由于多个IP号段可能对应一个城市ID，因此将此号段内左右IP号循环添加到redis中，
-                 * 又因为多个IP号段可能为同一个城市ID，所以将计数器的值拼接在城市ID后
-                 *
-                 * 表格样式如： startIpNum endIpNum locId
+                 * .parseInt() method is end at 2147483648
                  */
-                int startNum = Integer.parseInt(record.get(0), 10);
-                int endNum = Integer.parseInt(record.get(1), 10);
-                String cityNo = record.get(2);
-                for (int next = startNum; next <= endNum; next++) {
-                    count++;
-                    pipe.zadd("ip2CityId:", next, cityNo + "_" + count);
-                    /*
-                     * pipeline如果积压了太多写操作，会导致长时间无法提交插入，导致pipeline操作被服务器强行终止，
-                     * 自测还会导致redis服务器宕机，所以这里只要操作超过一百万条就提交一次，关闭连接后再重新获取链接
-                     */
-                    if (count >= 1000000 && (count % 1000000 == 0)) {
-                        printer("已插入: " + count);
-                        pipe.sync();
-                        if (pipe != null) {
-                            printer("pipe close! And restart...");
-                            pipe.close();
-                        }
-                        /*
-                         * 由于远程服务器内存有限，当前2G内存在保存了550万条数据以后就无法再写入数据，导致redis服务
-                         * 器宕机，所以现只写入150万条数据以供测试使用
-                         */
-                        if (count >= 1500000) {
-                            quit = true;
-                            break;
-                        }
-                        pipe = conn.pipelined();
-                        Thread.sleep(2000);
-                    }
-                }
-                if (quit) {
-                    printer("数据复制人为终止...");
-                    break;
-                }
+                int startNum = Integer.parseInt(recordList.get(i).get(0), 10);
+                String cityNo = recordList.get(i).get(2);
+                pipe.zadd("ip2CityId:", startNum, cityNo + "_" + i);
             }
-            if (pipe != null) {
-                pipe.sync();
-                pipe.close();
-            }
+            pipe.sync();
         } catch (FileNotFoundException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
             throw new RuntimeException(e);
-        } catch (InterruptedException e) {
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    /**
+     * import Cities into redis
+     *
+     * @param file
+     */
+    public void importCitesToRedis(File file) {
+        Gson gson = new Gson();
+        FileReader reader = null;
+        Pipeline pipe = conn.pipelined();
+        try {
+            reader = new FileReader(file);
+            CSVParser parser = new CSVParser(reader, CSVFormat.DEFAULT);
+            List<CSVRecord> recordList = parser.getRecords();
+            for (int i = 0; i < recordList.size(); i++) {
+                /*
+                 * 当i大于2时（因为前两行是表头）开始获取数据
+                 */
+                if (i <= 1) {
+                    continue;
+                }
+                printer("currentNum: " + i);
+                /*
+                 * 取出locId, country, region, city，并转成json格式存入redisHash
+                 */
+                String cityStr = gson.toJson(new String[]{recordList.get(i).get(0), recordList.get(i).get(1),
+                        recordList.get(i).get(2), recordList.get(i).get(3)});
+                pipe.hset("cityId2City:", recordList.get(i).get(0), cityStr);
+            }
+            pipe.sync();
+        } catch (Exception e) {
             e.printStackTrace();
         } finally {
             if (reader != null) {
@@ -450,6 +450,81 @@ public class Chapter05 extends RedisHandler {
                 }
             }
         }
+
+    }
+
+    /**
+     * 查询IP所属城市信息
+     */
+    public void testIpLookup() {
+        printer("\n----- testIpLookup -----");
+        File blocks = new File("/Users/yangkaiqiang/Documents/data/GeoLiteCity-Blocks.csv");
+        File locations = new File("/Users/yangkaiqiang/Documents/data/GeoLiteCity-Location.csv");
+        if (!blocks.exists()) {
+            printer("*****");
+            printer("GeoLiteCity-Blocks.csv file not found...");
+            printer("*****");
+        }
+        if (!locations.exists()) {
+            printer("*****");
+            printer("GeoLiteCity-Blocks.csv file not found...");
+            printer("*****");
+        }
+
+        printer("importing IP addresses to Redis...(this may take a while)");
+//        importIpsToRedis(blocks);
+        long ranges = conn.zcard("ip2CityId:");
+        printer("Loaded ranges into Redis: " + ranges);
+        assert ranges > 1000;
+        printer();
+
+        printer("importing Location lookups into Redis...(this may take a while)");
+//        importCitesToRedis(locations);
+        long cities = conn.hlen("ip2CityId: ");
+        printer("Loaded city lookups into redis: " + cities);
+        assert cities > 1000;
+        printer();
+
+        printer("Let's lookup some locations!");
+        for (int i = 0; i < 10; i++) {
+            String ip = randomOctet(255) + '.' +
+                    randomOctet(256) + '.' +
+                    randomOctet(256) + '.' +
+                    randomOctet(256);
+            printer(Arrays.toString(findCityByIp(ip)));
+        }
+
+    }
+
+    /**
+     * 生成指定范围内的随机数
+     *
+     * @param max
+     * @return
+     */
+    public String randomOctet(int max) {
+        return String.valueOf((int) (Math.random() * max));
+    }
+
+    /**
+     * 通过IP查找城市信息
+     *
+     * @param ipAddress
+     * @return
+     */
+    public String[] findCityByIp(String ipAddress) {
+        int score = ipToScore(ipAddress);
+        /*
+         * 获取IP分值小于或等于给定分值的城市ID
+         */
+        Set<String> results = conn.zrevrangeByScore("ip2CityId:", score, 0, 0, 1);
+        if (results.size() == 0) {
+            return null;
+        }
+
+        String cityId = results.iterator().next();
+        cityId = cityId.substring(0, cityId.indexOf('_'));
+        return new Gson().fromJson(conn.hget("cityId2City:", cityId), String[].class);
     }
 }
 
