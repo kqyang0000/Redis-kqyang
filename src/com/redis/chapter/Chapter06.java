@@ -4,11 +4,10 @@ import com.redis.common.RedisHandler;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Transaction;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 public class Chapter06 extends RedisHandler {
+    private static final String VALID_CHARACTERS = "`abcdefghijklmnopqrstuvwxyz{";
     private static final Jedis conn = getConn();
 
     public static void main(String[] args) {
@@ -73,6 +72,79 @@ public class Chapter06 extends RedisHandler {
         Collections.sort(contacts);
         assert equiv.equals(contacts);
         conn.del("recent:user");
+    }
+
+    /**
+     * 通讯录自动补全功能
+     */
+    public void testAddressBookAutocomplete() {
+        printer("\n----- testAddressBookAutocomplete -----");
+        conn.del("members:test");
+        printer("the start/end range of 'abc' is: " + Arrays.toString(findPrefixRange("abc")));
+        printer();
+
+        printer("Let's add a few people to the guild");
+        for (String name : new String[]{"jeff", "jenny", "jack", "jennifer"}) {
+            joinGuild("test", name);
+        }
+        printer();
+        printer("now let's try to find users with names starting with 'je':");
+    }
+
+    /**
+     * 获取前驱/后继
+     *
+     * @param prefix
+     * @return
+     */
+    public String[] findPrefixRange(String prefix) {
+        int pos = VALID_CHARACTERS.indexOf(prefix.charAt(prefix.length() - 1));
+        char suffix = VALID_CHARACTERS.charAt(pos > 0 ? pos - 1 : 0);
+        String start = prefix.substring(0, prefix.length() - 1) + suffix + '{';
+        String end = prefix + '{';
+        return new String[]{start, end};
+    }
+
+    /**
+     * 添加联系人到通讯录
+     *
+     * @param guild
+     * @param user
+     */
+    public void joinGuild(String guild, String user) {
+        conn.zadd("members:" + guild, 0, user);
+    }
+
+    /**
+     * 通讯录自动补全
+     *
+     * @param guild
+     * @param prefix
+     * @return
+     */
+    public Set<String> autocompleteOnPrefix(String guild, String prefix) {
+        String[] range = findPrefixRange(prefix);
+        String start = range[0];
+        String end = range[1];
+        String identifier = getUUID();
+        start += identifier;
+        end += identifier;
+        String zsetName = "members:" + guild;
+
+        /*
+         * 将两个带有前驱和后继的元素插入到有序集合中，这样一来所在范围内的所有元素就会被包含在先后插入的两个元素之间，
+         * 在findPrefixRange方法中在前驱和后继拼接'{'是为了过滤掉有多个相同前缀查询时被插入有序集合中的前驱和后继，
+         * identifier在此处也是为了区别开多个相同前缀同时查询带来的问题
+         */
+        conn.zadd(zsetName, 0, start);
+        conn.zadd(zsetName, 0, end);
+
+        Set<String> items = null;
+        while (true) {
+            conn.watch(zsetName);
+
+        }
+
     }
 
     /**
